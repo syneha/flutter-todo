@@ -1,192 +1,140 @@
 import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final database = openDatabase(
-    join(await getDatabasesPath(), 'todos_database.db'),
-    onCreate: (db, version) {
-      return db.execute(
-        "CREATE TABLE todos(id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT, isCompleted INTEGER)",
-      );
-    },
-    version: 1,
-  );
-
-  runApp(TodoApp(database: database));
+  await Firebase.initializeApp();
+  runApp(TodoApp());
 }
 
 class Todo {
-  final int id;
-  final String text;
-  final bool isCompleted;
+  final String title;
+  bool isDone;
 
   Todo({
-    required this.id,
-    required this.text,
-    required this.isCompleted,
+    required this.title,
+    this.isDone = false,
   });
-
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'text': text,
-      'isCompleted': isCompleted ? 1 : 0,
-    };
-  }
-
-  factory Todo.fromMap(Map<String, dynamic> map) {
-    return Todo(
-      id: map['id'],
-      text: map['text'],
-      isCompleted: map['isCompleted'] == 1,
-    );
-  }
 }
 
-class TodoApp extends StatefulWidget {
-  final Future<Database> database;
-
-  TodoApp({required this.database});
-
-  @override
-  _TodoAppState createState() => _TodoAppState();
-}
-
-class _TodoAppState extends State<TodoApp> {
-  TextEditingController _textEditingController = TextEditingController();
-  List<Todo> todos = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchTodos();
-  }
-
-  Future<void> _fetchTodos() async {
-    final Database db = await widget.database;
-    final List<Map<String, dynamic>> maps = await db.query('todos');
-
-    setState(() {
-      todos = List.generate(maps.length, (i) {
-        return Todo.fromMap(maps[i]);
-      });
-    });
-  }
-
-  Future<void> _addTodo() async {
-    final text = _textEditingController.text;
-    if (text.isNotEmpty) {
-      final Database db = await widget.database;
-      await db.insert(
-        'todos',
-        Todo(
-          id: todos.length +
-              1, // Assign a unique ID, you may need to adjust this logic.
-          text: text,
-          isCompleted: false,
-        ).toMap(),
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      _textEditingController.clear();
-      _fetchTodos();
-    }
-  }
-
-  Future<void> _toggleTodoStatus(int id, bool isCompleted) async {
-    final Database db = await widget.database;
-    await db.update(
-      'todos',
-      {'isCompleted': isCompleted ? 1 : 0},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    _fetchTodos();
-  }
-
-  Future<void> _editTodo(int id, String newText) async {
-    final Database db = await widget.database;
-    await db.update(
-      'todos',
-      {'text': newText},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    _fetchTodos();
-  }
-
-  Future<void> _deleteTodo(int id) async {
-    final Database db = await widget.database;
-    await db.delete(
-      'todos',
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    _fetchTodos();
-  }
-
+class TodoApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: Text('Todo App with SQFlite'),
-        ),
-        body: Column(
-          children: <Widget>[
-            Padding(
-              padding: EdgeInsets.all(16.0),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: TextField(
-                      controller: _textEditingController,
-                      decoration: InputDecoration(
-                        hintText: 'Enter a task',
-                      ),
-                    ),
+      title: 'Todo App',
+      home: TodoListScreen(),
+    );
+  }
+}
+
+class TodoListScreen extends StatefulWidget {
+  @override
+  _TodoListScreenState createState() => _TodoListScreenState();
+}
+
+class _TodoListScreenState extends State<TodoListScreen> {
+  final CollectionReference todoCollection =
+      FirebaseFirestore.instance.collection('todos');
+
+  // ...
+
+  void addTodo(String title) async {
+    try {
+      await todoCollection.add({
+        'title': title,
+        'isDone': false,
+      });
+    } catch (e) {
+      print('Error adding todo: $e');
+    }
+  }
+
+  void toggleTodoStatus(String documentID, bool isDone) async {
+    try {
+      await todoCollection.doc(documentID).update({'isDone': isDone});
+    } catch (e) {
+      print('Error updating todo: $e');
+    }
+  }
+
+  // ...
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      ElevatedButton(
+        onPressed: () {
+          showDialog(
+            context: context,
+            builder: (context) {
+              String newTask = '';
+              return AlertDialog(
+                title: Text('Add Task'),
+                content: TextField(
+                  onChanged: (taskName) {
+                    newTask = taskName;
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Enter task name',
                   ),
-                  IconButton(
-                    icon: Icon(Icons.add),
-                    onPressed: _addTodo,
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context); // Close the dialog
+                    },
+                    child: Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      if (newTask.trim().isNotEmpty) {
+                        addTodo(newTask);
+                        Navigator.pop(context); // Close the dialog
+                      }
+                    },
+                    child: Text('Add'),
                   ),
                 ],
-              ),
-            ),
-            Expanded(
-              child: ListView.builder(
-                itemCount: todos.length,
-                itemBuilder: (context, index) {
-                  final todo = todos[index];
-                  return ListTile(
-                    title: Text(
-                      todo.text,
-                      style: TextStyle(
-                        decoration: todo.isCompleted
-                            ? TextDecoration.lineThrough
-                            : TextDecoration.none,
-                      ),
+              );
+            },
+          );
+        },
+        child: Text('Add Task'),
+      ),
+      Expanded(
+        child: StreamBuilder<QuerySnapshot>(
+          stream: todoCollection.snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return CircularProgressIndicator();
+            }
+
+            List<DocumentSnapshot> documents = snapshot.data!.docs;
+
+            return ListView.builder(
+              itemCount: documents.length,
+              itemBuilder: (context, index) {
+                final todo = documents[index];
+                return ListTile(
+                  title: Text(
+                    todo['title'],
+                    style: TextStyle(
+                      decoration: todo['isDone']
+                          ? TextDecoration.lineThrough
+                          : TextDecoration.none,
                     ),
-                    trailing: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: <Widget>[
-                        IconButton(
-                          icon: Icon(Icons.edit),
-                          onPressed: () => _editTodo(todo.id, todo.text),
-                        ),
-                        IconButton(
-                          icon: Icon(Icons.delete),
-                          onPressed: () => _deleteTodo(todo.id),
-                        ),
-                      ],
-                    ),
-                    onTap: () => _toggleTodoStatus(todo.id, !todo.isCompleted),
-                  );
-                },
-              ),
-            ),
-          ],
+                  ),
+                  trailing: Checkbox(
+                    value: todo['isDone'],
+                    onChanged: (bool? value) {
+                      toggleTodoStatus(todo.id, value ?? false);
+                    },
+                  ),
+                );
+              },
+            );
+          },
         ),
       ),
     );
