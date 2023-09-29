@@ -1,142 +1,83 @@
+
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  runApp(TodoApp());
+ 
+// function to trigger build when the app is run
+void main() {
+  runApp(MaterialApp(
+    initialRoute: '/',
+    routes: {
+      '/': (context) => const HomeRoute(),
+      '/second': (context) => const SecondRoute(),
+      '/third': (context) => const ThirdRoute(),
+    },
+  )); //MaterialApp
 }
-
-class Todo {
-  final String title;
-  bool isDone;
-
-  Todo({
-    required this.title,
-    this.isDone = false,
-  });
-}
-
-class TodoApp extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Todo App',
-      home: TodoListScreen(),
-    );
-  }
-}
-
-class TodoListScreen extends StatefulWidget {
-  @override
-  _TodoListScreenState createState() => _TodoListScreenState();
-}
-
-class _TodoListScreenState extends State<TodoListScreen> {
-  final CollectionReference todoCollection =
-      FirebaseFirestore.instance.collection('todos');
-
-  // ...
-
-  void addTodo(String title) async {
-    try {
-      await todoCollection.add({
-        'title': title,
-        'isDone': false,
-      });
-    } catch (e) {
-      print('Error adding todo: $e');
-    }
-  }
-
-  void toggleTodoStatus(String documentID, bool isDone) async {
-    try {
-      await todoCollection.doc(documentID).update({'isDone': isDone});
-    } catch (e) {
-      print('Error updating todo: $e');
-    }
-  }
-
-  // ...
-
+ 
+class HomeRoute extends StatelessWidget {
+  const HomeRoute({Key? key}) : super(key: key);
+ 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      ElevatedButton(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) {
-              String newTask = '';
-              return AlertDialog(
-                title: Text('Add Task'),
-                content: TextField(
-                  onChanged: (taskName) {
-                    newTask = taskName;
-                  },
-                  decoration: InputDecoration(
-                    hintText: 'Enter task name',
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context); // Close the dialog
-                    },
-                    child: Text('Cancel'),
-                  ),
-                  ElevatedButton(
-                    onPressed: () {
-                      if (newTask.trim().isNotEmpty) {
-                        addTodo(newTask);
-                        Navigator.pop(context); // Close the dialog
-                      }
-                    },
-                    child: Text('Add'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-        child: Text('Add Task'),
-      ),
-      Expanded(
-        child: StreamBuilder<QuerySnapshot>(
-          stream: todoCollection.snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return CircularProgressIndicator();
-            }
-
-            List<DocumentSnapshot> documents = snapshot.data!.docs;
-
-            return ListView.builder(
-              itemCount: documents.length,
-              itemBuilder: (context, index) {
-                final todo = documents[index];
-                return ListTile(
-                  title: Text(
-                    todo['title'],
-                    style: TextStyle(
-                      decoration: todo['isDone']
-                          ? TextDecoration.lineThrough
-                          : TextDecoration.none,
-                    ),
-                  ),
-                  trailing: Checkbox(
-                    value: todo['isDone'],
-                    onChanged: (bool? value) {
-                      toggleTodoStatus(todo.id, value ?? false);
-                    },
-                  ),
-                );
+      appBar: AppBar(
+        title: const Text('First_page'),
+        backgroundColor: Colors.red,
+      ), // AppBar
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            ElevatedButton(
+              child: const Text('Click here'),
+              onPressed: () {
+                Navigator.pushNamed(context, '/second');
               },
-            );
+            ), // ElevatedButton
+            ElevatedButton(
+              child: const Text('Tap here!'),
+              onPressed: () {
+                Navigator.pushNamed(context, '/third');
+              },
+            ), // ElevatedButton
+          ], // <Widget>[]
+        ), // Column
+      ), // Center
+    ); // Scaffold
+  }
+}
+ 
+class SecondRoute extends StatelessWidget {
+  const SecondRoute({Key? key}) : super(key: key);
+ 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Second_page"),
+        backgroundColor: Color.fromARGB(255, 162, 33, 173),
+      ), // AppBar
+      body: Center(
+        child: ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
           },
-        ),
-      ),
-    );
+          child: const Text('Back'),
+        ), // ElevatedButton
+      ), // Center
+    ); // Scaffold
+  }
+}
+ 
+class ThirdRoute extends StatelessWidget {
+  const ThirdRoute({Key? key}) : super(key: key);
+ 
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Third_page"),
+        backgroundColor: Color.fromARGB(255, 192, 135, 11),
+      ), // AppBar
+    ); // Scaffold
   }
 }
